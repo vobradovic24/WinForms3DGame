@@ -13,6 +13,58 @@ namespace WinForms3DGame {
         HashSet<Keys> pressedKeys = new HashSet<Keys>();
         MovementMode movementMode = MovementMode.Normal;
         float movementSpeed = 0.1f;
+        FractalType currentFractal = FractalType.Square;
+        int fractalDepth = 0;
+        Vector3[][] polygons = [];
+        float size = 10;
+
+        public void RenderFractal() {
+            List<Vector3[]> newPolygons = new List<Vector3[]>();
+            if (currentFractal == FractalType.Triangle) {
+                TriangleFractal(0, 0, 0, size, size / 2 * MathF.Sqrt(3), newPolygons);
+            } else if (currentFractal == FractalType.Pyramid) {
+                List<Vector3[]> polyhedrons = new List<Vector3[]>();
+                PyramidFractal(0, 0, 0, 0, size, size / 2 * MathF.Sqrt(3), size / MathF.Sqrt(2f/3f), polyhedrons);
+                foreach (Vector3[] polyhedron in polyhedrons) {
+                    newPolygons.Add([polyhedron[0], polyhedron[1], polyhedron[2]]);
+                    newPolygons.Add([polyhedron[0], polyhedron[1], polyhedron[3]]);
+                    newPolygons.Add([polyhedron[0], polyhedron[2], polyhedron[3]]);
+                    newPolygons.Add([polyhedron[1], polyhedron[2], polyhedron[3]]);
+                }
+            }
+            polygons = newPolygons.ToArray();
+            Invalidate();
+        }
+
+        public void TriangleFractal(int depth, float xOffset, float yOffset, float side, float height, List<Vector3[]> polygons) {
+            if (depth == fractalDepth) {
+                polygons.Add([
+                    new Vector3(xOffset, yOffset, 10),
+                    new Vector3(xOffset + side / 2, yOffset + height, 10),
+                    new Vector3(xOffset + side, yOffset, 10)
+                ]);
+            } else {
+                TriangleFractal(depth + 1, xOffset, yOffset, side / 2, height / 2, polygons);
+                TriangleFractal(depth + 1, xOffset + size / MathF.Pow(2, depth + 2), yOffset + size / 2 * MathF.Sqrt(3) / MathF.Pow(2, depth + 1), side / 2, height / 2, polygons);
+                TriangleFractal(depth + 1, xOffset + size / MathF.Pow(2, depth + 1), yOffset, side / 2, height / 2, polygons);
+            }
+        }
+
+        public void PyramidFractal(int depth, float xOffset, float yOffset, float zOffset, float side, float sideHeight, float height, List<Vector3[]> polyhedrons) {
+            if (depth == fractalDepth) {
+                polyhedrons.Add([
+                    new Vector3(xOffset, yOffset, zOffset),
+                    new Vector3(xOffset + side / 2, yOffset, zOffset),
+                    new Vector3(xOffset + side / 4, yOffset, zOffset + sideHeight / 2),
+                    new Vector3(xOffset + side / 4, yOffset + height / 2, zOffset + sideHeight / 4)
+                ]);
+            } else {
+                PyramidFractal(depth + 1, xOffset, yOffset, zOffset, side / 2, sideHeight / 2, height / 2, polyhedrons);
+                PyramidFractal(depth + 1, xOffset + side / 4, yOffset, zOffset, side / 2, sideHeight / 2, height / 2, polyhedrons);
+                PyramidFractal(depth + 1, xOffset + side / 8, yOffset, zOffset + sideHeight / 4, side / 2, sideHeight / 2, height / 2, polyhedrons);
+                PyramidFractal(depth + 1, xOffset + side / 8, yOffset + height / 4, zOffset + sideHeight / 8, side / 2, sideHeight / 2, height / 2, polyhedrons);
+            }
+        }
 
         public Form1() {
             InitializeComponent();
@@ -24,31 +76,16 @@ namespace WinForms3DGame {
         }
 
         private void Form1_Paint(object sender, PaintEventArgs e) {
-            Vector3[] poly1 = { new Vector3(0f, 4f, 8f), new Vector3(4f, 4f, 8f), new Vector3(4f, 0f, 8f), new Vector3(0f, 0f, 8f) };
-            PointF[] projPoly1 = Utils.Vec2ToPointF_Flipped(camera.ProjectPolygon(poly1));
-            Vector3[] poly2 = { new Vector3(4f, 4f, 8f), new Vector3(4f, 4f, 4f), new Vector3(4f, 0f, 4f), new Vector3(4f, 0f, 8f) };
-            PointF[] projPoly2 = Utils.Vec2ToPointF_Flipped(camera.ProjectPolygon(poly2));
-            Vector3[] poly3 = { new Vector3(0f, 0f, 8f), new Vector3(4f, 4f, 4f), new Vector3(4f, 0f, 4f) };
-            PointF[] projPoly3 = Utils.Vec2ToPointF_Flipped(camera.ProjectPolygon(poly3));
-
-            float[] distances = { camera.PolygonDist(poly1), camera.PolygonDist(poly2), camera.PolygonDist(poly3) };
-            Vector3[][] polygons = { poly1, poly2, poly3 };
+            float[] distances = new float[polygons.Length];
+            for (int i = 0; i < polygons.Length; i++)
+                distances[i] = camera.PolygonDist(polygons[i]);
             Array.Sort(distances, polygons);
+            Array.Reverse(polygons);
+            Pen pen = Pens.Black;
+            Brush brush = Brushes.Gray;
 
-            Pen pen = new Pen(Color.Black);
-            Brush brushBlue = new SolidBrush(Color.Blue);
-            Brush brushGreen = new SolidBrush(Color.Green);
-            Brush brushRed = new SolidBrush(Color.Red);
-            Brush brushBlack = new SolidBrush(Color.Black);
-
-            for (int i = 2; i >= 0; i--) {
-                Brush brush;
+            for (int i = 0; i < polygons.Length; i++) {
                 Vector3[] currentPoly = polygons[i];
-
-                if (currentPoly == poly1) brush = brushBlue;
-                else if (currentPoly == poly2) brush = brushGreen;
-                else if (currentPoly == poly3) brush = brushRed;
-                else brush = brushBlack;
 
                 camera.RenderPolygon(e.Graphics, currentPoly, pen, brush);
             }
@@ -82,7 +119,21 @@ namespace WinForms3DGame {
             else if (e.KeyCode == Keys.NumPad4) movementSpeed -= 0.05f;
             else if (e.KeyCode == Keys.NumPad8) movementMode = (MovementMode)((int)(movementMode + 1) % 3);
             else if (e.KeyCode == Keys.NumPad2) movementMode = (MovementMode)((int)(movementMode + 2) % 3);
-            else pressedKeys.Add(e.KeyCode);
+            else if (e.KeyCode == Keys.Z) {
+                currentFractal = (FractalType)((int)(currentFractal + 5) % 6);
+                fractalDepth = 0;
+                RenderFractal();
+            } else if (e.KeyCode == Keys.X) {
+                currentFractal = (FractalType)((int)(currentFractal + 1) % 6);
+                fractalDepth = 0;
+                RenderFractal();
+            } else if (e.KeyCode == Keys.C) {
+                fractalDepth = Math.Max(0, fractalDepth - 1);
+                RenderFractal();
+            } else if (e.KeyCode == Keys.V) {
+                fractalDepth++;
+                RenderFractal();
+            } else pressedKeys.Add(e.KeyCode);
             movementSpeed = Math.Clamp(movementSpeed, 0.05f, 0.5f);
         }
         private void Form1_KeyUp(object sender, KeyEventArgs e) {
@@ -190,7 +241,9 @@ namespace WinForms3DGame {
                 $"Roll: {MathF.Round(camera.rotation.Z * 180 / MathF.PI, 4)}\n" +
                 $"Position: {camera.position.X}, {camera.position.Y}, {camera.position.Z}\n" +
                 $"Movement Mode: {(movementMode == MovementMode.Normal ? "Normal" : movementMode == MovementMode.Flying ? "Flying" : "Noclip")}\n" +
-                $"Movement Speed: {movementSpeed}";
+                $"Movement Speed: {movementSpeed}\n" +
+                $"Fractal Depth: {fractalDepth}\n" +
+                $"Fractal Type: {Enum.GetName(typeof(FractalType), currentFractal)}";
             Invalidate();
         }
 
@@ -202,6 +255,15 @@ namespace WinForms3DGame {
         Normal = 0,
         Flying = 1,
         Noclip = 2
+    }
+
+    public enum FractalType {
+        Square = 0,
+        Triangle = 1,
+        Snowflake = 2,
+        Cube = 3,
+        Pyramid = 4,
+        Snowflake3D = 5
     }
 
     public class Polygon {
@@ -252,26 +314,25 @@ namespace WinForms3DGame {
             float sinRoll = MathF.Sin(-rotation.Z);
             float cosRoll = MathF.Cos(-rotation.Z);
 
-
             Matrix4x4 pitchMatrix = new Matrix4x4(
-                1, 0, 0, 0,
+                1, 0,         0,        0,
                 0, cosPitch, -sinPitch, 0,
-                0, sinPitch, cosPitch, 0,
-                0, 0, 0, 1);
+                0, sinPitch,  cosPitch, 0,
+                0, 0,         0,        1);
 
             Matrix4x4 yawMatrix = new Matrix4x4(
                  cosYaw, 0, sinYaw, 0,
-                 0, 1, 0, 0,
+                 0,      1, 0,      0,
                 -sinYaw, 0, cosYaw, 0,
-                 0, 0, 0, 1);
+                 0,      0, 0,      1);
 
             Matrix4x4 rollMatrix = new Matrix4x4(
                 cosRoll, -sinRoll, 0, 0,
-                sinRoll, cosRoll, 0, 0,
-                0, 0, 1, 0,
-                0, 0, 0, 1);
+                sinRoll,  cosRoll, 0, 0,
+                0,        0,       1, 0,
+                0,        0,       0, 1);
 
-            relDeltaPoint = Vector3.Transform(Vector3.Transform(Vector3.Transform(absDeltaPoint, rollMatrix), yawMatrix), pitchMatrix);
+            relDeltaPoint = Vector3.Transform(Vector3.Transform(Vector3.Transform(absDeltaPoint, yawMatrix), pitchMatrix), rollMatrix);
 
             if (MathF.Abs(relDeltaPoint.Z) < nearClipPlane) relDeltaPoint.Z = relDeltaPoint.Z < 0 ? -nearClipPlane : nearClipPlane;
             return relDeltaPoint;
