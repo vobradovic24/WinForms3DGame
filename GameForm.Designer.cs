@@ -58,6 +58,7 @@
             KeyUp += Form1_KeyUp;
             MouseMove += Form1_MouseMove;
             Resize += Form1_Resize;
+            this.Move += Form1_Move;
             ResumeLayout(false);
             PerformLayout();
         }

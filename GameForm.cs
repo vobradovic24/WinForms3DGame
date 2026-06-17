@@ -5,6 +5,7 @@ using System.Drawing.Design;
 using System.Drawing;
 using System.Runtime.InteropServices.Marshalling;
 using System.Reflection;
+using System.Diagnostics.Eventing.Reader;
 
 namespace WinForms3DGame; 
 public partial class GameForm : Form {
@@ -26,14 +27,14 @@ public partial class GameForm : Form {
             List<Vector3[]> polyhedrons = new List<Vector3[]>();
             PyramidFractal(0, 0, 0, 0, size, size / 2 * MathF.Sqrt(3), size * MathF.Sqrt(2f/3f), polyhedrons);
             foreach (Vector3[] polyhedron in polyhedrons) {
-                newPolygons.Add(new Polygon([polyhedron[0], polyhedron[1], polyhedron[2]], Brushes.Orange, Pens.Black));
-                newPolygons.Add(new Polygon([polyhedron[0], polyhedron[1], polyhedron[3]], Brushes.Red, Pens.Black));
-                newPolygons.Add(new Polygon([polyhedron[0], polyhedron[2], polyhedron[3]], Brushes.Green, Pens.Black));
-                newPolygons.Add(new Polygon([polyhedron[1], polyhedron[2], polyhedron[3]], Brushes.Blue, Pens.Black));
+                newPolygons.Add(new Polygon([polyhedron[0], polyhedron[1], polyhedron[2]], Brushes.Orange));
+                newPolygons.Add(new Polygon([polyhedron[0], polyhedron[1], polyhedron[3]], Brushes.Red));
+                newPolygons.Add(new Polygon([polyhedron[0], polyhedron[2], polyhedron[3]], Brushes.Green));
+                newPolygons.Add(new Polygon([polyhedron[1], polyhedron[2], polyhedron[3]], Brushes.Blue));
             }
         }
         polygons = newPolygons.ToArray();
-        Invalidate();
+        //Invalidate(true);
     }
 
     public void TriangleFractal(int depth, float xOffset, float yOffset, float side, float height, List<Polygon> polygons) {
@@ -93,7 +94,11 @@ public partial class GameForm : Form {
         Utils.screenSize = new Vector2(ClientSize.Width, ClientSize.Height);
         Utils.windowCenter = PointToScreen(Utils.Vec2ToPoint(Utils.screenSize / 2));
         camera.updateFOV(camera.hFOV);
-        Invalidate();
+        Invalidate(true);
+    }
+
+    private void Form1_Move(object sender, EventArgs e) {
+        Utils.windowCenter = PointToScreen(Utils.Vec2ToPoint(Utils.screenSize / 2));
     }
 
     private void Form1_MouseMove(object sender, MouseEventArgs e) {
@@ -103,7 +108,7 @@ public partial class GameForm : Form {
         camera.rotation.Y += deltaPos.X * MathF.PI / 360;
         camera.rotation.X -= deltaPos.Y * MathF.PI / 360;
         camera.rotation.X = Math.Clamp(camera.rotation.X, -MathF.PI / 2, MathF.PI / 2);
-        Invalidate();
+        Invalidate(true);
     }
 
     private void Form1_KeyDown(object sender, KeyEventArgs e) {
@@ -184,11 +189,11 @@ public partial class GameForm : Form {
                     break;
                 case Keys.Oemplus:
                     float newFOV = camera.hFOV + MathF.PI / 36;
-                    if (newFOV <= MathF.PI * 2 / 3) camera.updateFOV(newFOV);
+                    if (newFOV <= MathF.PI * 3 / 2) camera.updateFOV(newFOV);
                     break;
                 case Keys.OemMinus:
                     newFOV = camera.hFOV - MathF.PI / 36;
-                    if (newFOV >= MathF.PI / 3) camera.updateFOV(newFOV);
+                    if (newFOV >= MathF.PI / 6) camera.updateFOV(newFOV);
                     break;
                 case Keys.Control | Keys.Oemplus:
                     movementSpeed += 0.05f;
@@ -208,25 +213,40 @@ public partial class GameForm : Form {
                     camera.position.X += -posChange.Z * MathF.Sin(-camera.rotation.Y) + posChange.X * MathF.Cos(-camera.rotation.Y);
                     camera.position.Y += posChange.Y;
                     break;
-                /*/ Source-like noclip
+                //*/ Source-like noclip
                 case MovementMode.Noclip:
+                    float sinYaw = MathF.Sin(-camera.rotation.Y);
+                    float cosYaw = MathF.Cos(camera.rotation.Y);
+
                     float sinPitch = MathF.Sin(camera.rotation.X);
                     float cosPitch = MathF.Cos(camera.rotation.X);
 
-                    float sinYaw = MathF.Sin(camera.rotation.Y);
-                    float cosYaw = MathF.Cos(camera.rotation.Y);
-
-                    float sinRoll = MathF.Sin(-camera.rotation.Z);
-                    float cosRoll = MathF.Cos(-camera.rotation.Z);
-
-                    Matrix4x4 rollMatrix = new Matrix4x4(
-                        cosRoll, -sinRoll, 0, 0,
-                        sinRoll, cosRoll, 0, 0,
-                        0, 0, 1, 0,
-                        0, 0, 0, 1);
+                    float sinRoll = MathF.Sin(camera.rotation.Z);
+                    float cosRoll = MathF.Cos(camera.rotation.Z);
 
                     Matrix4x4 yawMatrix = new Matrix4x4(
-                        );
+                         cosYaw, 0,  sinYaw, 0,
+                         0,      1,  0,      0,
+                        -sinYaw, 0,  cosYaw, 0,
+                         0,      0,  0,      1);
+
+                    Matrix4x4 pitchMatrix = new Matrix4x4(
+                         1,  0,         0, 0,
+                         0,  cosPitch, -sinPitch, 0,
+                         0,  sinPitch,  cosPitch, 0,
+                         0,  0,         0,        1);
+
+                    Matrix4x4 rollMatrix = new Matrix4x4(
+                         cosRoll, -sinRoll, 0, 0,
+                         sinRoll,  cosRoll, 0, 0,
+                         0,        0,       1, 0,
+                         0,        0,       0, 1);
+
+                    Vector3 relMovement = Vector3.Transform(posChange, pitchMatrix * yawMatrix * rollMatrix);
+
+                    
+                    camera.position += relMovement;
+
                     break;
                 //*/
             }
@@ -242,7 +262,7 @@ public partial class GameForm : Form {
             $"Movement Speed: {movementSpeed}\n" +
             $"Fractal Depth: {fractalDepth}\n" +
             $"Fractal Type: {Enum.GetName(typeof(FractalType), currentFractal)}";
-        Invalidate();
+        Invalidate(true);
     }
 
     private void Form1_KeyPress(object sender, KeyPressEventArgs e) {

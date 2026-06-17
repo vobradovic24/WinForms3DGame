@@ -33,7 +33,6 @@ public class Camera {
         Vector3 absDeltaPoint = point - position;
         Vector3 relDeltaPoint = new Vector3();
 
-
         float sinPitch = MathF.Sin(-rotation.X);
         float cosPitch = MathF.Cos(-rotation.X);
 
@@ -61,7 +60,8 @@ public class Camera {
              0, 0, 1, 0,
              0, 0, 0, 1);
 
-        relDeltaPoint = Vector3.Transform(Vector3.Transform(Vector3.Transform(absDeltaPoint, yawMatrix), pitchMatrix), rollMatrix);
+        //relDeltaPoint = Vector3.Transform(Vector3.Transform(Vector3.Transform(absDeltaPoint, yawMatrix), pitchMatrix), rollMatrix);
+        relDeltaPoint = Vector3.Transform(absDeltaPoint, yawMatrix * pitchMatrix * rollMatrix);
 
         if (MathF.Abs(relDeltaPoint.Z) < nearClipPlane) relDeltaPoint.Z = relDeltaPoint.Z < 0 ? -nearClipPlane : nearClipPlane;
         return relDeltaPoint;

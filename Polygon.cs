@@ -26,6 +26,17 @@ public class Polygon {
         brush = fillBrush;
         pen = linePen;
     }
+    public Polygon(Vector3[] polygon, Brush fillBrush) {
+        points = polygon;
+        brush = fillBrush;
+        pen = Pens.Transparent;
+    }
+
+    public Polygon(Vector3[] polygon, Pen linePen) {
+        points = polygon;
+        brush = Brushes.Transparent;
+        pen = linePen;
+    }
 
     public Polygon(Vector3[] polygon) {
         points = polygon;
