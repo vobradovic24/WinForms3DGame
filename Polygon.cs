@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 
 namespace WinForms3DGame; 
 public class Polygon {
-    Vector3[] points;
-    Brush brush;
-    Pen pen;
+    public Vector3[] points;
+    public Brush brush;
+    public Pen pen;
 
     public Polygon(Vector3[] polygon, Color fillColor, Color lineColor) {
         points = polygon;
@@ -25,5 +25,11 @@ public class Polygon {
         points = polygon;
         brush = fillBrush;
         pen = linePen;
+    }
+
+    public Polygon(Vector3[] polygon) {
+        points = polygon;
+        brush = Brushes.Gray;
+        pen = Pens.Black;
     }
 }

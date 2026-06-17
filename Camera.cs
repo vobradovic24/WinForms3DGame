@@ -110,6 +110,11 @@ public class Camera {
     public float PolygonDist(Vector3[] points) {
         return Vector3.Distance(position, points.Aggregate(Vector3.Zero, (sum, vector) => sum + vector) / points.Length);
     }
+
+    public float PolygonDist(Polygon polygon) {
+        return PolygonDist(polygon.points);
+    }
+
     public Vector2 GetLimits(Vector3 point) {
         return new Vector2(point.Z * MathF.Tan(hFOV / 2), point.Z * MathF.Tan(vFOV / 2));
     }
@@ -179,5 +184,9 @@ public class Camera {
             graphics.FillPolygon(brush, projPolygon);
             graphics.DrawPolygon(pen, projPolygon);
         }
+    }
+
+    public void RenderPolygon(Graphics graphics, Polygon polygon) {
+        RenderPolygon(graphics, polygon.points, polygon.pen, polygon.brush);
     }
 }

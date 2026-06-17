@@ -15,34 +15,34 @@ public partial class GameForm : Form {
     float movementSpeed = 0.1f;
     FractalType currentFractal = FractalType.Square;
     int fractalDepth = 0;
-    Vector3[][] polygons = [];
+    Polygon[] polygons = [];
     float size = 10;
 
     public void RenderFractal() {
-        List<Vector3[]> newPolygons = new List<Vector3[]>();
+        List<Polygon> newPolygons = new List<Polygon>();
         if (currentFractal == FractalType.Triangle) {
             TriangleFractal(0, 0, 0, size, size / 2 * MathF.Sqrt(3), newPolygons);
         } else if (currentFractal == FractalType.Pyramid) {
             List<Vector3[]> polyhedrons = new List<Vector3[]>();
-            PyramidFractal(0, 0, 0, 0, size, size / 2 * MathF.Sqrt(3), size / MathF.Sqrt(2f/3f), polyhedrons);
+            PyramidFractal(0, 0, 0, 0, size, size / 2 * MathF.Sqrt(3), size * MathF.Sqrt(2f/3f), polyhedrons);
             foreach (Vector3[] polyhedron in polyhedrons) {
-                newPolygons.Add([polyhedron[0], polyhedron[1], polyhedron[2]]);
-                newPolygons.Add([polyhedron[0], polyhedron[1], polyhedron[3]]);
-                newPolygons.Add([polyhedron[0], polyhedron[2], polyhedron[3]]);
-                newPolygons.Add([polyhedron[1], polyhedron[2], polyhedron[3]]);
+                newPolygons.Add(new Polygon([polyhedron[0], polyhedron[1], polyhedron[2]], Brushes.Orange, Pens.Black));
+                newPolygons.Add(new Polygon([polyhedron[0], polyhedron[1], polyhedron[3]], Brushes.Red, Pens.Black));
+                newPolygons.Add(new Polygon([polyhedron[0], polyhedron[2], polyhedron[3]], Brushes.Green, Pens.Black));
+                newPolygons.Add(new Polygon([polyhedron[1], polyhedron[2], polyhedron[3]], Brushes.Blue, Pens.Black));
             }
         }
         polygons = newPolygons.ToArray();
         Invalidate();
     }
 
-    public void TriangleFractal(int depth, float xOffset, float yOffset, float side, float height, List<Vector3[]> polygons) {
+    public void TriangleFractal(int depth, float xOffset, float yOffset, float side, float height, List<Polygon> polygons) {
         if (depth == fractalDepth) {
-            polygons.Add([
+            polygons.Add(new Polygon([
                 new Vector3(xOffset, yOffset, 10),
                 new Vector3(xOffset + side / 2, yOffset + height, 10),
                 new Vector3(xOffset + side, yOffset, 10)
-            ]);
+            ]));
         } else {
             TriangleFractal(depth + 1, xOffset, yOffset, side / 2, height / 2, polygons);
             TriangleFractal(depth + 1, xOffset + size / MathF.Pow(2, depth + 2), yOffset + size / 2 * MathF.Sqrt(3) / MathF.Pow(2, depth + 1), side / 2, height / 2, polygons);
@@ -54,15 +54,15 @@ public partial class GameForm : Form {
         if (depth == fractalDepth) {
             polyhedrons.Add([
                 new Vector3(xOffset, yOffset, zOffset),
-                new Vector3(xOffset + side / 2, yOffset, zOffset),
-                new Vector3(xOffset + side / 4, yOffset, zOffset + sideHeight / 2),
-                new Vector3(xOffset + side / 4, yOffset + height / 2, zOffset + sideHeight / 4)
+                new Vector3(xOffset + side, yOffset, zOffset),
+                new Vector3(xOffset + side / 2, yOffset, zOffset + sideHeight),
+                new Vector3(xOffset + side / 2, yOffset + height, zOffset + sideHeight / 3)
             ]);
         } else {
             PyramidFractal(depth + 1, xOffset, yOffset, zOffset, side / 2, sideHeight / 2, height / 2, polyhedrons);
-            PyramidFractal(depth + 1, xOffset + side / 4, yOffset, zOffset, side / 2, sideHeight / 2, height / 2, polyhedrons);
-            PyramidFractal(depth + 1, xOffset + side / 8, yOffset, zOffset + sideHeight / 4, side / 2, sideHeight / 2, height / 2, polyhedrons);
-            PyramidFractal(depth + 1, xOffset + side / 8, yOffset + height / 4, zOffset + sideHeight / 8, side / 2, sideHeight / 2, height / 2, polyhedrons);
+            PyramidFractal(depth + 1, xOffset + side / 2, yOffset, zOffset, side / 2, sideHeight / 2, height / 2, polyhedrons);
+            PyramidFractal(depth + 1, xOffset + side / 4, yOffset, zOffset + sideHeight / 2, side / 2, sideHeight / 2, height / 2, polyhedrons);
+            PyramidFractal(depth + 1, xOffset + side / 4, yOffset + height / 2, zOffset + sideHeight / 6, side / 2, sideHeight / 2, height / 2, polyhedrons);
         }
     }
 
@@ -81,13 +81,11 @@ public partial class GameForm : Form {
             distances[i] = camera.PolygonDist(polygons[i]);
         Array.Sort(distances, polygons);
         Array.Reverse(polygons);
-        Pen pen = Pens.Black;
-        Brush brush = Brushes.Gray;
 
         for (int i = 0; i < polygons.Length; i++) {
-            Vector3[] currentPoly = polygons[i];
+            Polygon currentPoly = polygons[i];
 
-            camera.RenderPolygon(e.Graphics, currentPoly, pen, brush);
+            camera.RenderPolygon(e.Graphics, currentPoly);
         }
     }
 
