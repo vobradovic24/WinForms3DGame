@@ -25,13 +25,15 @@ public partial class GameForm : Form {
             TriangleFractal(0, 0, 0, size, size / 2 * MathF.Sqrt(3), newPolygons);
         } else if (currentFractal == FractalType.Pyramid) {
             List<Vector3[]> polyhedrons = new List<Vector3[]>();
-            PyramidFractal(0, 0, 0, 0, size, size / 2 * MathF.Sqrt(3), size * MathF.Sqrt(2f/3f), polyhedrons);
+            PyramidFractal(0, 0, 0, 0, size, size / 2 * MathF.Sqrt(3), size * MathF.Sqrt(2f / 3f), polyhedrons);
             foreach (Vector3[] polyhedron in polyhedrons) {
                 newPolygons.Add(new Polygon([polyhedron[0], polyhedron[1], polyhedron[2]], Brushes.Orange));
                 newPolygons.Add(new Polygon([polyhedron[0], polyhedron[1], polyhedron[3]], Brushes.Red));
                 newPolygons.Add(new Polygon([polyhedron[0], polyhedron[2], polyhedron[3]], Brushes.Green));
                 newPolygons.Add(new Polygon([polyhedron[1], polyhedron[2], polyhedron[3]], Brushes.Blue));
             }
+        } else if (currentFractal == FractalType.Snowflake3D) {
+            Snowflake3DFractal(0, 0, 0, 0, size, size / 2 * MathF.Sqrt(3), size * MathF.Sqrt(2f / 3f), newPolygons);
         }
         polygons = newPolygons.ToArray();
         //Invalidate(true);
@@ -64,6 +66,46 @@ public partial class GameForm : Form {
             PyramidFractal(depth + 1, xOffset + side / 2, yOffset, zOffset, side / 2, sideHeight / 2, height / 2, polyhedrons);
             PyramidFractal(depth + 1, xOffset + side / 4, yOffset, zOffset + sideHeight / 2, side / 2, sideHeight / 2, height / 2, polyhedrons);
             PyramidFractal(depth + 1, xOffset + side / 4, yOffset + height / 2, zOffset + sideHeight / 6, side / 2, sideHeight / 2, height / 2, polyhedrons);
+        }
+    }
+
+    public void Snowflake3DFractal(int depth, float xOffset, float yOffset, float zOffset, float side, float sideHeight, float height, List<Polygon> polygons) {
+        if (depth == fractalDepth) {
+            Vector3[] polyhedron = [
+                new Vector3(xOffset, yOffset, zOffset),
+                new Vector3(xOffset + side, yOffset, zOffset),
+                new Vector3(xOffset + side / 2, yOffset, zOffset + sideHeight),
+                new Vector3(xOffset + side / 2, yOffset + height, zOffset + sideHeight / 3)
+            ];
+            polygons.Add(new Polygon([polyhedron[2], polyhedron[1], polyhedron[0]]));
+            polygons.Add(new Polygon([polyhedron[0], polyhedron[1], polyhedron[3]]));
+            polygons.Add(new Polygon([polyhedron[3], polyhedron[2], polyhedron[0]]));
+            polygons.Add(new Polygon([polyhedron[1], polyhedron[2], polyhedron[3]]));
+        } else {
+            Snowflake3DFractal(depth + 1, xOffset, yOffset, zOffset, side, sideHeight, height, polygons);
+            List<Polygon> newPolygons = [];
+            foreach (Polygon polygon in polygons) {
+                Vector3 point0 = polygon.points[0];
+                Vector3 point1 = polygon.points[1];
+                Vector3 point2 = polygon.points[2];
+                Vector3 midpoint0 = (point0 + point1) / 2;
+                Vector3 midpoint1 = (point0 + point2) / 2;
+                Vector3 midpoint2 = (point1 + point2) / 2;
+                Vector3 middle = (point0 + point1 + point2) / 3;
+                Vector3 v1 = midpoint1 - midpoint0;
+                Vector3 v2 = midpoint2 - midpoint0;
+                Vector3 normal = Vector3.Cross(v1, v2);
+                normal /= normal.Length();
+                Vector3 tip = middle + normal * height / MathF.Pow(2, fractalDepth - depth);
+                newPolygons.Add(new Polygon([point0, midpoint0, midpoint1]));
+                newPolygons.Add(new Polygon([midpoint0, point1, midpoint2]));
+                newPolygons.Add(new Polygon([midpoint1, midpoint2, point2]));
+                newPolygons.Add(new Polygon([midpoint0, midpoint2, tip]));
+                newPolygons.Add(new Polygon([midpoint2, midpoint1, tip]));
+                newPolygons.Add(new Polygon([midpoint1, midpoint0, tip]));
+            }
+            polygons.Clear();
+            polygons.AddRange(newPolygons);
         }
     }
 
