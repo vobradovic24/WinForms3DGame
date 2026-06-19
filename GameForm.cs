@@ -1,23 +1,25 @@
-using System.Numerics;
-using System.Drawing.Drawing2D;
 using Microsoft.VisualBasic.Devices;
-using System.Drawing.Design;
-using System.Drawing;
-using System.Runtime.InteropServices.Marshalling;
-using System.Reflection;
+using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
+using System.Drawing;
+using System.Drawing.Design;
+using System.Drawing.Drawing2D;
+using System.Numerics;
+using System.Reflection;
+using System.Runtime.InteropServices.Marshalling;
 
 namespace WinForms3DGame; 
 public partial class GameForm : Form {
-    Camera camera;
-    public bool mouseLocked = false;
-    HashSet<Keys> pressedKeys = new HashSet<Keys>();
-    MovementMode movementMode = MovementMode.Normal;
-    float movementSpeed = 0.1f;
-    FractalType currentFractal = FractalType.Square;
-    int fractalDepth = 0;
-    Polygon[] polygons = [];
-    float size = 10;
+    public static Camera camera;
+    public static bool mouseLocked = false;
+    public static HashSet<Keys> pressedKeys = new HashSet<Keys>();
+    public static MovementMode movementMode = MovementMode.Walking;
+    public static float movementSpeed = 0.1f;
+    public static FractalType currentFractal = FractalType.Square;
+    public static int fractalDepth = 0;
+    public static Polygon[] polygons = [];
+    public static float size = 10;
+    public static Thread logicThread = new Thread(RunLogic);
 
     public void RenderFractal() {
         List<Polygon> newPolygons = new List<Polygon>();
@@ -77,10 +79,10 @@ public partial class GameForm : Form {
                 new Vector3(xOffset + side / 2, yOffset, zOffset + sideHeight),
                 new Vector3(xOffset + side / 2, yOffset + height, zOffset + sideHeight / 3)
             ];
-            polygons.Add(new Polygon([polyhedron[2], polyhedron[1], polyhedron[0]]));
-            polygons.Add(new Polygon([polyhedron[0], polyhedron[1], polyhedron[3]]));
-            polygons.Add(new Polygon([polyhedron[3], polyhedron[2], polyhedron[0]]));
-            polygons.Add(new Polygon([polyhedron[1], polyhedron[2], polyhedron[3]]));
+            polygons.Add(new Polygon([polyhedron[2], polyhedron[1], polyhedron[0]], Brushes.Red, Pens.Black));
+            polygons.Add(new Polygon([polyhedron[0], polyhedron[1], polyhedron[3]], Brushes.DarkGreen, Pens.Black));
+            polygons.Add(new Polygon([polyhedron[3], polyhedron[2], polyhedron[0]], Brushes.Orange, Pens.Black));
+            polygons.Add(new Polygon([polyhedron[1], polyhedron[2], polyhedron[3]], Brushes.DarkBlue, Pens.Black));
         } else {
             Snowflake3DFractal(depth + 1, xOffset, yOffset, zOffset, side, sideHeight, height, polygons);
             List<Polygon> newPolygons = [];
@@ -97,9 +99,9 @@ public partial class GameForm : Form {
                 Vector3 normal = Vector3.Cross(v1, v2);
                 normal /= normal.Length();
                 Vector3 tip = middle + normal * height / MathF.Pow(2, fractalDepth - depth);
-                newPolygons.Add(new Polygon([point0, midpoint0, midpoint1]));
-                newPolygons.Add(new Polygon([midpoint0, point1, midpoint2]));
-                newPolygons.Add(new Polygon([midpoint1, midpoint2, point2]));
+                newPolygons.Add(new Polygon([point0, midpoint0, midpoint1], polygon.brush, polygon.pen));
+                newPolygons.Add(new Polygon([midpoint0, point1, midpoint2], polygon.brush, polygon.pen));
+                newPolygons.Add(new Polygon([midpoint1, midpoint2, point2], polygon.brush, polygon.pen));
                 newPolygons.Add(new Polygon([midpoint0, midpoint2, tip]));
                 newPolygons.Add(new Polygon([midpoint2, midpoint1, tip]));
                 newPolygons.Add(new Polygon([midpoint1, midpoint0, tip]));
@@ -115,7 +117,7 @@ public partial class GameForm : Form {
         Utils.screenSize = new Vector2(ClientSize.Width, ClientSize.Height);
         Utils.windowCenter = PointToScreen(Utils.Vec2ToPoint(Utils.screenSize / 2));
         camera = new Camera(new Vector3(2f, 2f, 0f), new Vector3(0f, 0f, 0f), 100 * MathF.PI / 180);
-        gameTimer.Interval = 1000 / 60;
+        logicThread.Start();
     }
 
     private void Form1_Paint(object sender, PaintEventArgs e) {
@@ -130,6 +132,20 @@ public partial class GameForm : Form {
 
             camera.RenderPolygon(e.Graphics, currentPoly);
         }
+
+        e.Graphics.DrawString(
+            $"FOV: {MathF.Round(camera.hFOV * 180 / MathF.PI, 4)}\n" +
+            $"Pitch: {MathF.Round(camera.rotation.X * 180 / MathF.PI, 4)}\n" +
+            $"Yaw: {MathF.Round(camera.rotation.Y * 180 / MathF.PI, 4)}\n" +
+            $"Roll: {MathF.Round(camera.rotation.Z * 180 / MathF.PI, 4)}\n" +
+            $"Position: {camera.position.X}, {camera.position.Y}, {camera.position.Z}\n" +
+            $"Movement Mode: {Enum.GetName(typeof(MovementMode), movementMode)}\n" +
+            $"Movement Speed: {movementSpeed}\n" +
+            $"Fractal Depth: {fractalDepth}\n" +
+            $"Fractal Type: {Enum.GetName(typeof(FractalType), currentFractal)}",
+            SystemFonts.DefaultFont,
+            Brushes.Black,
+            5, 5);
     }
 
     private void Form1_Resize(object sender, EventArgs e) {
@@ -178,11 +194,11 @@ public partial class GameForm : Form {
         } else if (e.KeyCode == Keys.V) {
             fractalDepth++;
             RenderFractal();
-        } else pressedKeys.Add(e.KeyCode);
+        } else lock (pressedKeys) pressedKeys.Add(e.KeyCode);
         movementSpeed = Math.Clamp(movementSpeed, 0.05f, 0.5f);
     }
     private void Form1_KeyUp(object sender, KeyEventArgs e) {
-        pressedKeys.Remove(e.KeyCode);
+        lock (pressedKeys) pressedKeys.Remove(e.KeyCode);
     }
 
     private void gameTimer_Tick(object sender, EventArgs e) {
@@ -246,7 +262,7 @@ public partial class GameForm : Form {
 
         if (posChange != Vector3.Zero) {
             switch (movementMode) {
-                case MovementMode.Normal:
+                case MovementMode.Walking:
                     camera.position.Z += posChange.Z * MathF.Cos(-camera.rotation.Y) + posChange.X * MathF.Sin(-camera.rotation.Y);
                     camera.position.X += -posChange.Z * MathF.Sin(-camera.rotation.Y) + posChange.X * MathF.Cos(-camera.rotation.Y);
                     break;
@@ -255,7 +271,6 @@ public partial class GameForm : Form {
                     camera.position.X += -posChange.Z * MathF.Sin(-camera.rotation.Y) + posChange.X * MathF.Cos(-camera.rotation.Y);
                     camera.position.Y += posChange.Y;
                     break;
-                //*/ Source-like noclip
                 case MovementMode.Noclip:
                     float sinYaw = MathF.Sin(-camera.rotation.Y);
                     float cosYaw = MathF.Cos(camera.rotation.Y);
@@ -290,23 +305,138 @@ public partial class GameForm : Form {
                     camera.position += relMovement;
 
                     break;
-                //*/
             }
         }
-
-        label1.Text =
-            $"FOV: {MathF.Round(camera.hFOV * 180 / MathF.PI, 4)}\n" +
-            $"Pitch: {MathF.Round(camera.rotation.X * 180 / MathF.PI, 4)}\n" +
-            $"Yaw: {MathF.Round(camera.rotation.Y * 180 / MathF.PI, 4)}\n" +
-            $"Roll: {MathF.Round(camera.rotation.Z * 180 / MathF.PI, 4)}\n" +
-            $"Position: {camera.position.X}, {camera.position.Y}, {camera.position.Z}\n" +
-            $"Movement Mode: {(movementMode == MovementMode.Normal ? "Normal" : movementMode == MovementMode.Flying ? "Flying" : "Noclip")}\n" +
-            $"Movement Speed: {movementSpeed}\n" +
-            $"Fractal Depth: {fractalDepth}\n" +
-            $"Fractal Type: {Enum.GetName(typeof(FractalType), currentFractal)}";
         Invalidate(true);
     }
 
-    private void Form1_KeyPress(object sender, KeyPressEventArgs e) {
+    public static void RunLogic() {
+        Stopwatch stopwatch = new Stopwatch();
+        const int tickTime = 1000 / 60;
+        try {
+            while (true) {
+                stopwatch.Start();
+
+                // Logic Start
+
+                Vector3 posChange = Vector3.Zero;
+                foreach (Keys key in pressedKeys) {
+                    switch (key) {
+                        case Keys.Right:
+                            camera.rotation.Y += MathF.PI / 180;
+                            break;
+                        case Keys.Left:
+                            camera.rotation.Y -= MathF.PI / 180;
+                            break;
+                        case Keys.Up:
+                            camera.rotation.X += MathF.PI / 180;
+                            if (camera.rotation.X > MathF.PI / 2) camera.rotation.X = MathF.PI / 2;
+                            break;
+                        case Keys.Down:
+                            camera.rotation.X -= MathF.PI / 180;
+                            if (camera.rotation.X < -MathF.PI / 2) camera.rotation.X = -MathF.PI / 2;
+                            break;
+                        case Keys.E:
+                            camera.rotation.Z += MathF.PI / 180;
+                            camera.rotation.Z %= 2 * MathF.PI;
+                            break;
+                        case Keys.Q:
+                            camera.rotation.Z -= MathF.PI / 180;
+                            camera.rotation.Z %= 2 * MathF.PI;
+                            break;
+                        case Keys.W:
+                            posChange.Z += movementSpeed;
+                            break;
+                        case Keys.S:
+                            posChange.Z -= movementSpeed;
+                            break;
+                        case Keys.D:
+                            posChange.X += movementSpeed;
+                            break;
+                        case Keys.A:
+                            posChange.X -= movementSpeed;
+                            break;
+                        case Keys.Space:
+                            posChange.Y += movementSpeed;
+                            break;
+                        case Keys.ShiftKey:
+                            posChange.Y -= movementSpeed;
+                            break;
+                        case Keys.Oemplus:
+                            float newFOV = camera.hFOV + MathF.PI / 36;
+                            if (newFOV <= MathF.PI * 3 / 2) camera.updateFOV(newFOV);
+                            break;
+                        case Keys.OemMinus:
+                            newFOV = camera.hFOV - MathF.PI / 36;
+                            if (newFOV >= MathF.PI / 6) camera.updateFOV(newFOV);
+                            break;
+                        case Keys.Control | Keys.Oemplus:
+                            movementSpeed += 0.05f;
+                            break;
+                    }
+                }
+                camera.rotation.Y = camera.rotation.Y % (2 * MathF.PI);
+
+                if (posChange != Vector3.Zero) {
+                    switch (movementMode) {
+                        case MovementMode.Walking:
+                            camera.position.Z += posChange.Z * MathF.Cos(-camera.rotation.Y) + posChange.X * MathF.Sin(-camera.rotation.Y);
+                            camera.position.X += -posChange.Z * MathF.Sin(-camera.rotation.Y) + posChange.X * MathF.Cos(-camera.rotation.Y);
+                            break;
+                        case MovementMode.Flying:
+                            camera.position.Z += posChange.Z * MathF.Cos(-camera.rotation.Y) + posChange.X * MathF.Sin(-camera.rotation.Y);
+                            camera.position.X += -posChange.Z * MathF.Sin(-camera.rotation.Y) + posChange.X * MathF.Cos(-camera.rotation.Y);
+                            camera.position.Y += posChange.Y;
+                            break;
+                        case MovementMode.Noclip:
+                            float sinYaw = MathF.Sin(-camera.rotation.Y);
+                            float cosYaw = MathF.Cos(camera.rotation.Y);
+
+                            float sinPitch = MathF.Sin(camera.rotation.X);
+                            float cosPitch = MathF.Cos(camera.rotation.X);
+
+                            float sinRoll = MathF.Sin(camera.rotation.Z);
+                            float cosRoll = MathF.Cos(camera.rotation.Z);
+
+                            Matrix4x4 yawMatrix = new Matrix4x4(
+                                 cosYaw, 0, sinYaw, 0,
+                                 0, 1, 0, 0,
+                                -sinYaw, 0, cosYaw, 0,
+                                 0, 0, 0, 1);
+
+                            Matrix4x4 pitchMatrix = new Matrix4x4(
+                                 1, 0, 0, 0,
+                                 0, cosPitch, -sinPitch, 0,
+                                 0, sinPitch, cosPitch, 0,
+                                 0, 0, 0, 1);
+
+                            Matrix4x4 rollMatrix = new Matrix4x4(
+                                 cosRoll, -sinRoll, 0, 0,
+                                 sinRoll, cosRoll, 0, 0,
+                                 0, 0, 1, 0,
+                                 0, 0, 0, 1);
+
+                            Vector3 relMovement = Vector3.Transform(posChange, pitchMatrix * yawMatrix * rollMatrix);
+
+
+                            camera.position += relMovement;
+
+                            break;
+                    }
+                }
+
+                // Logic End
+
+                stopwatch.Stop();
+                int elapsedTime = (int)stopwatch.ElapsedMilliseconds;
+
+                int timeToSleep = tickTime - elapsedTime;
+                if (timeToSleep > 0) Thread.Sleep(timeToSleep);
+                //else Console.Error.WriteLine($"Falling behind, tick took {elapsedTime}ms, current tick late {-timeToSleep}ms");
+                stopwatch.Reset();
+            }
+        } catch (ThreadInterruptedException) {
+
+        }
     }
 }

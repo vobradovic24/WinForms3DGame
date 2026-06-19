@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace WinForms3DGame;
 
 public enum MovementMode {
-    Normal = 0,
+    Walking = 0,
     Flying = 1,
     Noclip = 2
 }
